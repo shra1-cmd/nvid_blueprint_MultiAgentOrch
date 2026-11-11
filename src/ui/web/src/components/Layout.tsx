@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI } from '../services/api';
 import { useDemoStatus } from '../hooks/useDemoStatus';
+import { useAutoLoop } from '../context/AutoLoopContext';
 import StatusBar from './StatusBar';
 
 interface LayoutProps {
@@ -39,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Demo mode detection — threaded from backend status so all pages show the indicator
   const { isDemoMode } = useDemoStatus();
+  const { autoLoop, toggleAutoLoop, isAnalyzing, pendingApprovalsCount, statusMessage } = useAutoLoop();
 
   const NavItems = () => (
     <>
@@ -176,6 +178,72 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
         >
           <NavItems />
+          {/* Cyclic loop button right beside DEPLOYMENT tab */}
+          <Box sx={{ display: 'flex', alignItems: 'center', ml: 1.5, mr: 1 }}>
+            <Box
+              component="button"
+              onClick={toggleAutoLoop}
+              data-testid="main-top-cyclic-loop-toggle"
+              title={
+                autoLoop
+                  ? `Cyclic Loop is ON (${statusMessage}). Click to turn OFF.`
+                  : 'Turn ON Cyclic Loop: Runs continuously and automatically triggers next cycle after each approval.'
+              }
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.75,
+                background: autoLoop ? '#2d1f05' : '#161B22',
+                border: `1px solid ${autoLoop ? '#D29922' : '#30363D'}`,
+                borderRadius: '4px',
+                px: 1.25,
+                py: '4px',
+                fontFamily: 'monospace',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                color: autoLoop ? '#E3B341' : '#8B949E',
+                cursor: 'pointer',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                transition: 'all 0.15s ease',
+                '&:hover': {
+                  color: autoLoop ? '#E3B341' : '#C9D1D9',
+                  borderColor: autoLoop ? '#D29922' : '#76B900',
+                  background: autoLoop ? '#3d2907' : '#1C2128',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: autoLoop ? '#E3B341' : '#484F58',
+                  boxShadow: autoLoop ? '0 0 6px #E3B341' : 'none',
+                  animation: autoLoop && isAnalyzing ? 'pulse 1.5s infinite' : 'none',
+                  flexShrink: 0,
+                }}
+              />
+              CYCLIC LOOP: {autoLoop ? 'ON' : 'OFF'}
+              {autoLoop && pendingApprovalsCount > 0 && (
+                <Box
+                  component="span"
+                  sx={{
+                    ml: 0.75,
+                    px: '5px',
+                    py: '1px',
+                    borderRadius: '3px',
+                    background: '#F8514933',
+                    border: '1px solid #F85149',
+                    color: '#F85149',
+                    fontSize: '0.6rem',
+                  }}
+                >
+                  PAUSED FOR APPROVAL
+                </Box>
+              )}
+            </Box>
+          </Box>
         </Box>
 
         {/* Right spacer + mobile hamburger */}

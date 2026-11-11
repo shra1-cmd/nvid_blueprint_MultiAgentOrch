@@ -20,6 +20,7 @@ import CopilotDrawer, { SnapshotContextLocal } from '../components/demo/copilot/
 import { SnapshotViewContext } from '../components/world/WorldContextSnapshot';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 import { describeDemoApiError } from '../components/demo/injectFeedback';
+import { useAutoLoop } from '../context/AutoLoopContext';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -284,12 +285,16 @@ function ScenarioHeader({
   onReset,
   onPause,
   isPaused,
+  autoLoop,
+  onToggleAutoLoop,
 }: {
   displayName: string;
   elapsedSeconds: number;
   onReset: () => void;
   onPause: () => void;
   isPaused: boolean;
+  autoLoop?: boolean;
+  onToggleAutoLoop?: () => void;
 }) {
   return (
     <Box sx={{
@@ -315,6 +320,35 @@ function ScenarioHeader({
         t={elapsedSeconds}s
       </Typography>
       <Box sx={{ flexGrow: 1 }} />
+      {onToggleAutoLoop && (
+        <Box
+          component="button"
+          onClick={onToggleAutoLoop}
+          data-testid="auto-loop-toggle"
+          title={autoLoop ? 'Disable Cyclic Auto-Loop' : 'Enable Cyclic Auto-Loop: auto-starts analysis and pauses for your approval each cycle'}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            background: autoLoop ? '#2d1f05' : 'transparent',
+            border: `1px solid ${autoLoop ? '#D29922' : '#21262D'}`,
+            borderRadius: '4px',
+            px: '8px', py: '3px',
+            fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 700,
+            color: autoLoop ? '#E3B341' : '#8B949E',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            '&:hover': { color: autoLoop ? '#E3B341' : '#C9D1D9', borderColor: autoLoop ? '#D29922' : '#30363D' },
+          }}
+        >
+          <Box sx={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: autoLoop ? '#E3B341' : '#484F58',
+            boxShadow: autoLoop ? '0 0 6px #E3B341' : 'none',
+          }} />
+          CYCLIC LOOP: {autoLoop ? 'ON' : 'OFF'}
+        </Box>
+      )}
       <Box
         component="button"
         onClick={onPause}
@@ -358,6 +392,7 @@ export default function DemoShell() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const { autoLoop, setAutoLoop } = useAutoLoop();
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
@@ -478,6 +513,7 @@ export default function DemoShell() {
   }, [queryClient, sseState, conversation]);
 
   const handleReset = useCallback(async () => {
+    setAutoLoop(false);          // cancel cyclic loop
     setShowSelector(true);       // show selector immediately
     sseState.clear();            // wipe SSE buffer so no stale events leak
     setAnalysisResult(null);     // clear pipeline result from previous run
@@ -494,16 +530,20 @@ export default function DemoShell() {
     if (analyzing) return;
     setAnalyzing(true);
     setAnalysisError(null);
+    setSelectedStage(null);
     try {
       const result = await demoAPI.analyze();
       setAnalysisResult(result);
       await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
     } catch (e) {
       setAnalysisError(describeDemoApiError(e));
+      // Do not automatically turn off autoLoop on transient errors
     } finally {
       setAnalyzing(false);
     }
   }, [analyzing, queryClient]);
+
+  // In DemoShell, cyclic auto-looping is managed continuously by AutoLoopContext (with button beside DEPLOYMENT tab)
 
   const handlePause = useCallback(async () => {
     if (demoStatus?.paused) {
@@ -554,6 +594,47 @@ export default function DemoShell() {
           Synthetic demo
         </Box>
         <Box sx={{ flexGrow: 1 }} />
+        {scenarioActive && (
+          <>
+            <Box
+              component="button"
+              onClick={() => setAutoLoop(a => !a)}
+              data-testid="persistent-top-auto-loop-toggle"
+              title={autoLoop ? 'Disable Cyclic Auto-Loop' : 'Enable Cyclic Auto-Loop: auto-analyzes and pauses for approval each cycle'}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.75,
+                background: autoLoop ? '#2d1f05' : 'transparent',
+                border: `1px solid ${autoLoop ? '#D29922' : '#30363D'}`,
+                borderRadius: '4px',
+                px: '10px',
+                py: '4px',
+                fontFamily: 'monospace',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                color: autoLoop ? '#E3B341' : '#8B949E',
+                cursor: 'pointer',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                transition: 'all 0.15s ease',
+                '&:hover': {
+                  color: autoLoop ? '#E3B341' : '#C9D1D9',
+                  borderColor: autoLoop ? '#D29922' : '#58A6FF',
+                },
+              }}
+            >
+              <Box sx={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: autoLoop ? '#E3B341' : '#484F58',
+                boxShadow: autoLoop ? '0 0 6px #E3B341' : 'none',
+                flexShrink: 0,
+              }} />
+              CYCLIC LOOP: {autoLoop ? 'ON' : 'OFF'}
+            </Box>
+            <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
+          </>
+        )}
         <Phase15CopilotButton
           active={scenarioActive}
           open={copilotOpen}
@@ -610,7 +691,59 @@ export default function DemoShell() {
               onReset={handleReset}
               onPause={handlePause}
               isPaused={isPaused}
+              autoLoop={autoLoop}
+              onToggleAutoLoop={() => setAutoLoop(a => !a)}
             />
+
+            {/* Cyclic Auto-Loop Banner */}
+            {autoLoop && (
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 2,
+                py: '5px',
+                background: '#1C1507',
+                borderBottom: '1px solid #D2992255',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: '#E3B341',
+                    boxShadow: '0 0 6px #E3B341',
+                    animation: analyzing ? 'pulse 1.5s infinite' : 'none',
+                  }} />
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.66rem', color: '#E3B341', fontWeight: 600 }}>
+                    {effectiveStage === 'APPROVE'
+                      ? '🛑 Cyclic Loop Paused: Review the action proposal and click APPROVE below to continue.'
+                      : effectiveStage === 'OUTCOME'
+                      ? '⏳ Outcome reached. Advancing simulation clock and starting next cycle in 3s...'
+                      : analyzing
+                      ? '🔄 Cyclic Loop: Running MAIW agent analysis...'
+                      : '🔄 Cyclic Loop Active — observing warehouse state...'}
+                  </Typography>
+                </Box>
+                <Box
+                  component="button"
+                  onClick={() => setAutoLoop(false)}
+                  sx={{
+                    background: 'transparent',
+                    border: '1px solid #D2992266',
+                    borderRadius: '3px',
+                    px: '8px',
+                    py: '2px',
+                    fontFamily: 'monospace',
+                    fontSize: '0.6rem',
+                    fontWeight: 600,
+                    color: '#E3B341',
+                    cursor: 'pointer',
+                    '&:hover': { background: '#2d1f05', borderColor: '#E3B341' },
+                  }}
+                >
+                  PAUSE LOOP
+                </Box>
+              </Box>
+            )}
 
             {/* Lifecycle rail — driven by SSE events */}
             <LifecycleRail
@@ -659,7 +792,88 @@ export default function DemoShell() {
               onReset={handleReset}
               onPause={handlePause}
               isPaused={isPaused}
+              autoLoop={autoLoop}
+              onToggleAutoLoop={() => setAutoLoop(a => !a)}
             />
+            {/* Cyclic Auto-Loop Banner in Reliability */}
+            {autoLoop && (
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 2,
+                py: '5px',
+                background: '#1C1507',
+                borderBottom: '1px solid #D2992255',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: '#E3B341',
+                    boxShadow: '0 0 6px #E3B341',
+                    animation: analyzing ? 'pulse 1.5s infinite' : 'none',
+                  }} />
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.66rem', color: '#E3B341', fontWeight: 600 }}>
+                    {effectiveStage === 'APPROVE'
+                      ? '🛑 Cyclic Loop Paused: Review proposal and click APPROVE to continue.'
+                      : effectiveStage === 'OUTCOME'
+                      ? '⏳ Outcome reached. Advancing simulation clock and starting next cycle in 3s...'
+                      : analyzing
+                      ? '🔄 Cyclic Loop: Running MAIW agent analysis...'
+                      : '🔄 Cyclic Loop Active — observing warehouse state...'}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {effectiveStage === 'APPROVE' && pendingApprovals.length > 0 && (
+                    <Box
+                      component="button"
+                      onClick={async () => {
+                        try {
+                          await demoAPI.approvePending(pendingApprovals[0].pending_id, 'operator');
+                          await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
+                        } catch (e) {
+                          console.error('Approval failed:', e);
+                        }
+                      }}
+                      sx={{
+                        background: '#238636',
+                        color: '#FFFFFF',
+                        border: '1px solid #2ea043',
+                        borderRadius: '3px',
+                        px: '8px',
+                        py: '2px',
+                        fontFamily: 'monospace',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        '&:hover': { background: '#2ea043' },
+                      }}
+                    >
+                      APPROVE ({pendingApprovals[0].capability})
+                    </Box>
+                  )}
+                  <Box
+                    component="button"
+                    onClick={() => setAutoLoop(false)}
+                    sx={{
+                      background: 'transparent',
+                      border: '1px solid #D2992266',
+                      borderRadius: '3px',
+                      px: '8px',
+                      py: '2px',
+                      fontFamily: 'monospace',
+                      fontSize: '0.6rem',
+                      fontWeight: 600,
+                      color: '#E3B341',
+                      cursor: 'pointer',
+                      '&:hover': { background: '#2d1f05', borderColor: '#E3B341' },
+                    }}
+                  >
+                    PAUSE LOOP
+                  </Box>
+                </Box>
+              </Box>
+            )}
             <ReliabilityPanel sseEvents={sseState.events} runtime={runtime} />
           </>
         )}

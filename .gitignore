@@ -192,3 +192,66 @@ UNNECESSARY_FILES.md
 
 # SonarQube scanner work directory (scripts/security/run_sonar_scan.sh)
 .scannerwork/
+
+
+# ==============================================================================
+# Model Weights, Checkpoints & Pre-trained Artifacts
+# ==============================================================================
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+*.h5
+*.pb
+*.tflite
+*.engine
+*.plan
+*.trt
+*.mlmodel
+*.gguf
+*.ggml
+
+# Model directories and checkpoints
+models/
+!packages/maiw-models/
+checkpoints/
+weights/
+pretrained_models/
+saved_models/
+
+# ==============================================================================
+# HuggingFace, NVIDIA & Triton Caches
+# ==============================================================================
+.cache/
+hf_cache/
+huggingface/
+.triton/
+triton_cache/
+wandb/
+mlruns/
+tensorboard_logs/
+
+# ==============================================================================
+# Local Data, Raw Datasets & Large Embeddings
+# ==============================================================================
+*.parquet
+*.feather
+*.h5py
+*.faiss
+*.index
+*.vec
+data/raw/
+data/processed/
+data/exports/
+!data/sample/
+!data/uploads/.gitkeep
+
+# ==============================================================================
+# Local Run / IDE Scripts & Overrides
+# ==============================================================================
+.run/
+local_run.sh
+*.override.yml
+*.override.yaml

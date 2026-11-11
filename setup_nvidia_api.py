@@ -54,7 +54,7 @@ def setup_nvidia_api():
         print("❌ No API key provided. Exiting.")
         return False
     
-    if api_key == "your_nvidia_api_key_here":
+    if api_key == "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":
         print("❌ Please enter your actual API key, not the placeholder.")
         return False
     
@@ -65,7 +65,7 @@ def setup_nvidia_api():
             content = f.read()
         
         # Replace placeholder API keys
-        content = content.replace("your_nvidia_api_key_here", api_key)
+        content = content.replace("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", api_key)
         
         # Write back to .env
         with open(env_file, 'w') as f:
