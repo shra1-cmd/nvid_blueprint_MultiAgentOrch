@@ -277,7 +277,7 @@ if (($#)); then shift; fi
 case "$action" in
   start)
     cmd_start
-    ;;.
+    ;;
   stop)
     cmd_stop
     ;;
