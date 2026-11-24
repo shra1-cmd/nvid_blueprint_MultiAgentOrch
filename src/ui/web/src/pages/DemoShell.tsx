@@ -199,7 +199,7 @@ function BackendErrorBanner({ onRetry }: { onRetry: () => void }) {
         Backend unavailable
       </Typography>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E', lineHeight: 1.5 }}>
-        Cannot reach the MAIW demo API. Confirm the backend is running on port 8000 and the proxy is configured.
+        Cannot reach the MAIW demo API. Confirm the backend is running (./run.sh status shows its port, default 8001) and the proxy target matches it.
       </Typography>
       <Box
         component="button"
